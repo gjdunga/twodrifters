@@ -27,19 +27,19 @@ export default function PondScene() {
       brightness: Math.random() * 0.6 + 0.4,
     }))
 
-    // Lanterns floating on water
-    s.lanterns = Array.from({ length: 5 }, (_, i) => ({
-      x: (w * 0.15) + Math.random() * (w * 0.7),
-      y: waterLine + 10 + Math.random() * (h * 0.15),
+    // Toro nagashi (floating water lanterns): square paper body on wooden raft
+    s.lanterns = Array.from({ length: 6 }, () => ({
+      x: (w * 0.1) + Math.random() * (w * 0.8),
+      y: waterLine + 8 + Math.random() * (h * 0.18),
       baseY: 0,
-      width: 18 + Math.random() * 10,
-      height: 22 + Math.random() * 8,
-      speed: 0.15 + Math.random() * 0.2,
-      bobSpeed: 0.008 + Math.random() * 0.005,
-      bobAmount: 2 + Math.random() * 2,
+      size: 20 + Math.random() * 10,
+      speed: 0.1 + Math.random() * 0.15,
+      bobSpeed: 0.006 + Math.random() * 0.004,
+      bobAmount: 1.5 + Math.random() * 1.5,
       bobOffset: Math.random() * Math.PI * 2,
-      glowIntensity: 0.6 + Math.random() * 0.4,
-      hue: Math.random() > 0.5 ? 25 : 10, // warm orange/red
+      tiltOffset: Math.random() * Math.PI * 2,
+      hue: [15, 20, 25, 8, 30][Math.floor(Math.random() * 5)],
+      paperAlpha: 0.85 + Math.random() * 0.1,
     }))
     s.lanterns.forEach((l) => { l.baseY = l.y })
 
@@ -176,62 +176,127 @@ export default function PondScene() {
       ctx.stroke()
     }
 
-    // ---- LANTERNS ----
+    // ---- TORO NAGASHI (floating water lanterns) ----
     s.lanterns.forEach((lan) => {
-      // Update position
-      lan.x += lan.speed * (Math.sin(t * 0.002) * 0.5 + 0.5) * 0.3
-      if (lan.x > w + 30) lan.x = -30
+      // Update position: gentle drift
+      lan.x += lan.speed * (0.3 + Math.sin(t * 0.0015 + lan.bobOffset) * 0.2)
+      if (lan.x > w + 50) lan.x = -50
       lan.y = lan.baseY + Math.sin(t * lan.bobSpeed + lan.bobOffset) * lan.bobAmount
 
       const lx = lan.x
       const ly = lan.y
-      const lw = lan.width
-      const lh = lan.height
-      const flicker = 0.85 + Math.sin(t * 0.05 + lan.bobOffset) * 0.15
+      const sz = lan.size
+      const half = sz / 2
+      const flicker = 0.82 + Math.sin(t * 0.06 + lan.bobOffset) * 0.12
+        + Math.sin(t * 0.13 + lan.tiltOffset) * 0.06
+      // Gentle tilt from water motion
+      const tilt = Math.sin(t * 0.008 + lan.tiltOffset) * 0.04
 
-      // Lantern glow on water
-      const waterGlow = ctx.createRadialGradient(lx, ly + lh, 2, lx, ly + lh * 2, lh * 3)
-      waterGlow.addColorStop(0, `rgba(255, ${150 + lan.hue * 2}, ${50 + lan.hue}, ${0.08 * flicker})`)
-      waterGlow.addColorStop(1, 'transparent')
-      ctx.fillStyle = waterGlow
-      ctx.fillRect(lx - lh * 3, ly, lh * 6, lh * 4)
+      ctx.save()
+      ctx.translate(lx, ly)
+      ctx.rotate(tilt)
 
-      // Lantern glow (air)
-      const airGlow = ctx.createRadialGradient(lx, ly, lw * 0.3, lx, ly, lw * 2.5)
-      airGlow.addColorStop(0, `rgba(255, ${160 + lan.hue * 2}, ${60 + lan.hue}, ${0.12 * flicker})`)
+      // --- Water reflection glow ---
+      const reflGlow = ctx.createRadialGradient(0, sz * 0.8, 1, 0, sz * 1.5, sz * 2.5)
+      reflGlow.addColorStop(0, `rgba(255, ${150 + lan.hue * 3}, ${50 + lan.hue}, ${0.1 * flicker})`)
+      reflGlow.addColorStop(1, 'transparent')
+      ctx.fillStyle = reflGlow
+      ctx.fillRect(-sz * 2.5, sz * 0.3, sz * 5, sz * 3)
+
+      // --- Air glow around lantern ---
+      const airGlow = ctx.createRadialGradient(0, -half * 0.3, sz * 0.2, 0, -half * 0.3, sz * 2)
+      airGlow.addColorStop(0, `rgba(255, ${160 + lan.hue * 2}, ${60 + lan.hue}, ${0.1 * flicker})`)
       airGlow.addColorStop(1, 'transparent')
       ctx.fillStyle = airGlow
       ctx.beginPath()
-      ctx.arc(lx, ly, lw * 2.5, 0, Math.PI * 2)
+      ctx.arc(0, -half * 0.3, sz * 2, 0, Math.PI * 2)
       ctx.fill()
 
-      // Lantern body
-      const bodyGrad = ctx.createLinearGradient(lx, ly - lh / 2, lx, ly + lh / 2)
-      bodyGrad.addColorStop(0, `rgba(255, ${180 + lan.hue}, ${80 + lan.hue}, ${0.9 * flicker})`)
-      bodyGrad.addColorStop(0.5, `rgba(255, ${140 + lan.hue}, ${40 + lan.hue}, ${0.95 * flicker})`)
-      bodyGrad.addColorStop(1, `rgba(200, ${100 + lan.hue}, ${30 + lan.hue}, ${0.7 * flicker})`)
-      ctx.fillStyle = bodyGrad
+      // --- Wooden raft base ---
+      // Flat platform sitting on water surface
+      const raftH = sz * 0.15
+      const raftW = sz * 1.3
+      const raftY = half * 0.3
+      ctx.fillStyle = `rgba(60, 35, 18, ${0.9 * flicker})`
+      ctx.fillRect(-raftW / 2, raftY, raftW, raftH)
+      // Raft edge highlight
+      ctx.fillStyle = `rgba(90, 55, 28, ${0.5 * flicker})`
+      ctx.fillRect(-raftW / 2, raftY, raftW, 1.5)
+      // Raft planks (subtle)
+      ctx.strokeStyle = `rgba(40, 22, 10, ${0.4 * flicker})`
+      ctx.lineWidth = 0.5
+      for (let p = -raftW / 2 + raftW * 0.25; p < raftW / 2; p += raftW * 0.25) {
+        ctx.beginPath()
+        ctx.moveTo(p, raftY)
+        ctx.lineTo(p, raftY + raftH)
+        ctx.stroke()
+      }
 
-      // Rounded lantern shape
+      // --- Paper body (square) ---
+      const bodyTop = -half * 0.9
+      const bodyH = sz * 1.1
+      const bodyW = sz * 0.95
+      // Warm paper gradient: lit from inside
+      const paperGrad = ctx.createRadialGradient(
+        0, bodyTop + bodyH * 0.45, sz * 0.1,
+        0, bodyTop + bodyH * 0.45, sz * 0.7
+      )
+      paperGrad.addColorStop(0, `rgba(255, ${200 + lan.hue}, ${100 + lan.hue * 2}, ${lan.paperAlpha * flicker})`)
+      paperGrad.addColorStop(0.5, `rgba(255, ${160 + lan.hue}, ${60 + lan.hue}, ${(lan.paperAlpha - 0.1) * flicker})`)
+      paperGrad.addColorStop(1, `rgba(200, ${110 + lan.hue}, ${30 + lan.hue}, ${(lan.paperAlpha - 0.2) * flicker})`)
+      ctx.fillStyle = paperGrad
+      ctx.fillRect(-bodyW / 2, bodyTop, bodyW, bodyH)
+
+      // --- Wooden frame edges ---
+      ctx.strokeStyle = `rgba(70, 38, 15, ${0.7 * flicker})`
+      ctx.lineWidth = 1.2
+      // Outer frame rectangle
+      ctx.strokeRect(-bodyW / 2, bodyTop, bodyW, bodyH)
+      // Cross frame: vertical center
       ctx.beginPath()
-      ctx.ellipse(lx, ly, lw / 2, lh / 2, 0, 0, Math.PI * 2)
+      ctx.moveTo(0, bodyTop)
+      ctx.lineTo(0, bodyTop + bodyH)
+      ctx.stroke()
+      // Cross frame: horizontal center
+      ctx.beginPath()
+      ctx.moveTo(-bodyW / 2, bodyTop + bodyH * 0.5)
+      ctx.lineTo(bodyW / 2, bodyTop + bodyH * 0.5)
+      ctx.stroke()
+
+      // --- Roof cap ---
+      const roofY = bodyTop - sz * 0.08
+      const roofW = bodyW * 1.15
+      const roofH = sz * 0.12
+      ctx.fillStyle = `rgba(55, 30, 15, ${0.85 * flicker})`
+      ctx.beginPath()
+      ctx.moveTo(-roofW / 2, bodyTop)
+      ctx.lineTo(0, roofY)
+      ctx.lineTo(roofW / 2, bodyTop)
+      ctx.closePath()
+      ctx.fill()
+      // Roof edge
+      ctx.fillRect(-roofW / 2 - 1, bodyTop - 1, roofW + 2, 2)
+
+      // --- Small finial on top ---
+      ctx.fillStyle = `rgba(70, 40, 18, ${0.8 * flicker})`
+      ctx.fillRect(-1.5, roofY - 4, 3, 4)
+
+      // --- Candle flame inside (bright core) ---
+      const flameX = Math.sin(t * 0.1 + lan.tiltOffset) * 1.2
+      const flameY = bodyTop + bodyH * 0.42
+      const flameGrad = ctx.createRadialGradient(
+        flameX, flameY, 0,
+        flameX, flameY, sz * 0.18
+      )
+      flameGrad.addColorStop(0, `rgba(255, 255, 220, ${0.6 * flicker})`)
+      flameGrad.addColorStop(0.4, `rgba(255, 200, 80, ${0.3 * flicker})`)
+      flameGrad.addColorStop(1, 'transparent')
+      ctx.fillStyle = flameGrad
+      ctx.beginPath()
+      ctx.arc(flameX, flameY, sz * 0.18, 0, Math.PI * 2)
       ctx.fill()
 
-      // Frame lines
-      ctx.strokeStyle = `rgba(80, 40, 20, ${0.4 * flicker})`
-      ctx.lineWidth = 0.8
-      ctx.beginPath()
-      ctx.moveTo(lx, ly - lh / 2)
-      ctx.lineTo(lx, ly + lh / 2)
-      ctx.stroke()
-      ctx.beginPath()
-      ctx.moveTo(lx - lw / 2, ly)
-      ctx.lineTo(lx + lw / 2, ly)
-      ctx.stroke()
-
-      // Top knob
-      ctx.fillStyle = `rgba(60, 30, 15, 0.8)`
-      ctx.fillRect(lx - 2, ly - lh / 2 - 4, 4, 5)
+      ctx.restore()
     })
 
     // ---- FIREFLIES ----
