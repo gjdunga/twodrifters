@@ -299,6 +299,25 @@ export default function Layout({ children }) {
         >
           &copy; {new Date().getFullYear()} Pat & Jack
         </p>
+        <p
+          style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: '0.6rem',
+            color: 'var(--text-muted)',
+            marginTop: '0.4rem',
+            opacity: 0.5,
+          }}
+        >
+          Another Wonderful Creation by{' '}
+          <a
+            href="https://dstaftn.net"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--gold-dim)', textDecoration: 'none' }}
+          >
+            DunganSoft Technologies
+          </a>
+        </p>
       </footer>
     </AudioProvider>
   )
