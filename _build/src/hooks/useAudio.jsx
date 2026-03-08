@@ -7,34 +7,39 @@ export function AudioProvider({ children }) {
   const [currentTrack, setCurrentTrack] = useState(null)
   const audioRef = useRef(null)
   const fadeRef = useRef(null)
-  // Refs mirror state so callbacks never read stale closures
   const isPlayingRef = useRef(false)
   const currentTrackRef = useRef(null)
 
   useEffect(() => {
     const el = new Audio()
     el.loop = true
-    el.volume = 0
+    el.volume = 0.3
     el.preload = 'auto'
     audioRef.current = el
 
-    // Sync state from native events (covers edge cases like browser pause)
-    const onPlay = () => {
+    const syncPlay = () => {
       isPlayingRef.current = true
       setIsPlaying(true)
     }
-    const onPause = () => {
+    const syncPause = () => {
       isPlayingRef.current = false
       setIsPlaying(false)
     }
-    el.addEventListener('play', onPlay)
-    el.addEventListener('pause', onPause)
+    const onError = () => {
+      console.error('Audio error:', el.error?.message, 'src:', el.src)
+    }
+
+    el.addEventListener('play', syncPlay)
+    el.addEventListener('pause', syncPause)
+    el.addEventListener('error', onError)
 
     return () => {
-      el.removeEventListener('play', onPlay)
-      el.removeEventListener('pause', onPause)
+      el.removeEventListener('play', syncPlay)
+      el.removeEventListener('pause', syncPause)
+      el.removeEventListener('error', onError)
       el.pause()
-      el.src = ''
+      el.removeAttribute('src')
+      el.load()
       if (fadeRef.current) clearInterval(fadeRef.current)
     }
   }, [])
@@ -46,105 +51,114 @@ export function AudioProvider({ children }) {
     }
   }, [])
 
-  const fadeIn = useCallback((target = 0.4, duration = 2000) => {
+  const fadeTo = useCallback((target, duration = 1500) => {
     const el = audioRef.current
     if (!el) return
     clearFade()
-    const steps = 40
+    const steps = 30
     const stepTime = duration / steps
-    const increment = target / steps
-    let vol = 0
-    el.volume = 0
+    const startVol = el.volume
+    const delta = (target - startVol) / steps
+    let step = 0
 
     fadeRef.current = setInterval(() => {
-      vol = Math.min(vol + increment, target)
+      step++
+      const vol = Math.max(0, Math.min(1, startVol + delta * step))
       try { el.volume = vol } catch {}
-      if (vol >= target) clearFade()
+      if (step >= steps) {
+        try { el.volume = target } catch {}
+        clearFade()
+        if (target === 0) el.pause()
+      }
     }, stepTime)
   }, [clearFade])
 
-  const fadeOut = useCallback((duration = 800) => {
-    return new Promise((resolve) => {
-      const el = audioRef.current
-      if (!el || el.paused || el.volume < 0.01) {
-        resolve()
-        return
-      }
-      clearFade()
-      const steps = 20
-      const stepTime = duration / steps
-      const startVol = el.volume
-      const decrement = startVol / steps
-      let vol = startVol
-
-      fadeRef.current = setInterval(() => {
-        vol = Math.max(vol - decrement, 0)
-        try { el.volume = vol } catch {}
-        if (vol <= 0) {
-          clearFade()
-          el.pause()
-          resolve()
-        }
-      }, stepTime)
-    })
-  }, [clearFade])
-
-  // Play a URL. Tries primary, falls back to fallback on error.
-  const play = useCallback(async (url, fallbackUrl) => {
+  // SYNCHRONOUS play: no async boundary before el.play()
+  // preserves user gesture context in all browsers.
+  //
+  // Safe to call from useEffect too: if play fails (no gesture),
+  // current audio keeps running because we only switch src after
+  // confirming we can play. For non-gesture calls when nothing
+  // is currently playing, audio just stays silent until the user
+  // clicks the toggle button.
+  const play = useCallback((url, fallbackUrl) => {
     const el = audioRef.current
     if (!el || !url) return
 
-    // Already playing this exact track: no-op
+    // Already playing this track: no-op
     if (currentTrackRef.current === url && isPlayingRef.current) return
 
-    // Fade out current track if playing
-    if (isPlayingRef.current) {
-      await fadeOut(600)
+    // Save current state so we can restore on failure
+    const prevSrc = currentTrackRef.current
+    const wasPlaying = isPlayingRef.current
+    const prevVolume = el.volume
+
+    // Set new source (this stops current playback internally)
+    el.src = url
+    el.volume = wasPlaying ? 0.15 : 0.3
+
+    const onSuccess = () => {
+      currentTrackRef.current = url
+      setCurrentTrack(url)
+      fadeTo(0.4, 2000)
     }
 
-    const tryPlay = async (src) => {
-      el.src = src
-      el.load()
-      currentTrackRef.current = src
-      setCurrentTrack(src)
-      await el.play()
-      fadeIn(0.4, 2000)
-    }
-
-    try {
-      await tryPlay(url)
-    } catch (err) {
-      console.warn('Primary audio failed:', url, err.message)
-      if (fallbackUrl && fallbackUrl !== url) {
-        try {
-          await tryPlay(fallbackUrl)
-        } catch (err2) {
-          console.warn('Fallback audio also failed:', err2.message)
-        }
+    const onFail = (err, triedUrl) => {
+      console.warn('Audio play failed for:', triedUrl, err.message)
+      // Restore previous track if we had one playing
+      if (wasPlaying && prevSrc) {
+        el.src = prevSrc
+        el.volume = prevVolume
+        currentTrackRef.current = prevSrc
+        setCurrentTrack(prevSrc)
+        // Resume previous track (should succeed since browser already allowed it)
+        const p = el.play()
+        if (p) p.catch(() => {})
       }
     }
-  }, [fadeIn, fadeOut])
 
-  // Toggle: pause if playing, resume if paused
-  const toggle = useCallback(async () => {
+    const playPromise = el.play()
+    if (playPromise !== undefined) {
+      playPromise
+        .then(onSuccess)
+        .catch((err) => {
+          // Try fallback before restoring
+          if (fallbackUrl && fallbackUrl !== url) {
+            el.src = fallbackUrl
+            el.volume = wasPlaying ? 0.15 : 0.3
+            const fbPromise = el.play()
+            if (fbPromise !== undefined) {
+              fbPromise
+                .then(() => {
+                  currentTrackRef.current = fallbackUrl
+                  setCurrentTrack(fallbackUrl)
+                  fadeTo(0.4, 2000)
+                })
+                .catch((err2) => onFail(err2, fallbackUrl))
+            }
+          } else {
+            onFail(err, url)
+          }
+        })
+    }
+  }, [fadeTo])
+
+  // Toggle: mute/unmute with fade
+  const toggle = useCallback(() => {
     const el = audioRef.current
     if (!el) return
 
     if (isPlayingRef.current) {
-      await fadeOut(600)
-    } else {
-      // If there is a src loaded, resume it
-      if (el.src && el.src !== window.location.href) {
-        try {
-          await el.play()
-          fadeIn(0.4, 1000)
-        } catch (err) {
-          console.warn('Toggle play failed:', err.message)
-        }
+      fadeTo(0, 600)
+    } else if (el.src && el.src !== window.location.href) {
+      el.volume = 0.15
+      const p = el.play()
+      if (p !== undefined) {
+        p.then(() => fadeTo(0.4, 1000))
+         .catch((err) => console.warn('Toggle resume failed:', err.message))
       }
-      // If no src at all, toggle does nothing (nothing to resume)
     }
-  }, [fadeIn, fadeOut])
+  }, [fadeTo])
 
   return (
     <AudioCtx.Provider value={{ isPlaying, currentTrack, play, toggle }}>
