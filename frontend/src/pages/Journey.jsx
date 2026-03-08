@@ -23,7 +23,7 @@ export default function Journey() {
   useEffect(() => {
     const tracks = siteData.audioTracks.ambient
     const track = tracks[Math.floor(Math.random() * tracks.length)]
-    play(track.url, track.label)
+    play(track.url)
   }, [play])
 
   return (

@@ -8,13 +8,13 @@ import { siteData } from '../data/siteData'
 
 export default function Home() {
   const [entered, setEntered] = useState(false)
-  const { play, hasInteracted } = useAudio()
+  const { play } = useAudio()
 
   const handleEnter = () => {
     setEntered(true)
-    // Try home track first, fallback to ambient
+    // Try the real Moon River file first, fall back to royalty-free ambient
     const track = siteData.audioTracks.home
-    play(track.fallbackUrl, track.label)
+    play(track.url, track.fallbackUrl)
   }
 
   return (
