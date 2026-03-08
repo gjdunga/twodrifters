@@ -27,21 +27,27 @@ export default function PondScene() {
       brightness: Math.random() * 0.6 + 0.4,
     }))
 
-    // Toro nagashi (floating water lanterns): square paper body on wooden raft
-    s.lanterns = Array.from({ length: 6 }, () => ({
-      x: (w * 0.1) + Math.random() * (w * 0.8),
-      y: waterLine + 8 + Math.random() * (h * 0.18),
-      baseY: 0,
-      size: 20 + Math.random() * 10,
-      speed: 0.1 + Math.random() * 0.15,
-      bobSpeed: 0.006 + Math.random() * 0.004,
-      bobAmount: 1.5 + Math.random() * 1.5,
-      bobOffset: Math.random() * Math.PI * 2,
-      tiltOffset: Math.random() * Math.PI * 2,
-      hue: [15, 20, 25, 8, 30][Math.floor(Math.random() * 5)],
-      paperAlpha: 0.85 + Math.random() * 0.1,
-    }))
-    s.lanterns.forEach((l) => { l.baseY = l.y })
+    // Toy junk boats floating on water
+    s.junks = Array.from({ length: 5 }, () => {
+      const size = 28 + Math.random() * 18
+      return {
+        x: (w * 0.08) + Math.random() * (w * 0.84),
+        y: waterLine + 6 + Math.random() * (h * 0.2),
+        baseY: 0,
+        size,
+        speed: 0.08 + Math.random() * 0.14,
+        dir: Math.random() > 0.3 ? 1 : -1,
+        bobSpeed: 0.005 + Math.random() * 0.004,
+        bobAmount: 1.2 + Math.random() * 1.8,
+        bobOffset: Math.random() * Math.PI * 2,
+        tiltOffset: Math.random() * Math.PI * 2,
+        sailColor: ['#b83a2a', '#c44530', '#a33020', '#d4553e', '#8b2010'][Math.floor(Math.random() * 5)],
+        hullColor: ['#3a2010', '#4a2a15', '#30180a'][Math.floor(Math.random() * 3)],
+        numSails: Math.random() > 0.4 ? 2 : 1,
+        lanternHue: 15 + Math.random() * 20,
+      }
+    })
+    s.junks.forEach((j) => { j.baseY = j.y })
 
     // Fireflies
     s.fireflies = Array.from({ length: 15 }, () => ({
@@ -176,125 +182,185 @@ export default function PondScene() {
       ctx.stroke()
     }
 
-    // ---- TORO NAGASHI (floating water lanterns) ----
-    s.lanterns.forEach((lan) => {
-      // Update position: gentle drift
-      lan.x += lan.speed * (0.3 + Math.sin(t * 0.0015 + lan.bobOffset) * 0.2)
-      if (lan.x > w + 50) lan.x = -50
-      lan.y = lan.baseY + Math.sin(t * lan.bobSpeed + lan.bobOffset) * lan.bobAmount
+    // ---- TOY JUNK BOATS ----
+    s.junks.forEach((jk) => {
+      // Drift across water
+      jk.x += jk.speed * jk.dir * (0.4 + Math.sin(t * 0.001 + jk.bobOffset) * 0.15)
+      if (jk.dir > 0 && jk.x > w + 60) jk.x = -60
+      if (jk.dir < 0 && jk.x < -60) jk.x = w + 60
+      jk.y = jk.baseY + Math.sin(t * jk.bobSpeed + jk.bobOffset) * jk.bobAmount
 
-      const lx = lan.x
-      const ly = lan.y
-      const sz = lan.size
-      const half = sz / 2
-      const flicker = 0.82 + Math.sin(t * 0.06 + lan.bobOffset) * 0.12
-        + Math.sin(t * 0.13 + lan.tiltOffset) * 0.06
-      // Gentle tilt from water motion
-      const tilt = Math.sin(t * 0.008 + lan.tiltOffset) * 0.04
+      const sz = jk.size
+      const tilt = Math.sin(t * 0.007 + jk.tiltOffset) * 0.035
+      const flicker = 0.85 + Math.sin(t * 0.055 + jk.bobOffset) * 0.15
 
       ctx.save()
-      ctx.translate(lx, ly)
+      ctx.translate(jk.x, jk.y)
       ctx.rotate(tilt)
+      // Flip drawing if sailing left so the boat faces its direction
+      if (jk.dir < 0) ctx.scale(-1, 1)
 
-      // --- Water reflection glow ---
-      const reflGlow = ctx.createRadialGradient(0, sz * 0.8, 1, 0, sz * 1.5, sz * 2.5)
-      reflGlow.addColorStop(0, `rgba(255, ${150 + lan.hue * 3}, ${50 + lan.hue}, ${0.1 * flicker})`)
+      // --- Warm glow reflection on water ---
+      const reflGlow = ctx.createRadialGradient(0, sz * 0.5, 1, 0, sz * 1.2, sz * 2)
+      reflGlow.addColorStop(0, `rgba(255, ${160 + jk.lanternHue * 2}, ${60 + jk.lanternHue}, ${0.07 * flicker})`)
       reflGlow.addColorStop(1, 'transparent')
       ctx.fillStyle = reflGlow
-      ctx.fillRect(-sz * 2.5, sz * 0.3, sz * 5, sz * 3)
+      ctx.fillRect(-sz * 2, sz * 0.2, sz * 4, sz * 2.5)
 
-      // --- Air glow around lantern ---
-      const airGlow = ctx.createRadialGradient(0, -half * 0.3, sz * 0.2, 0, -half * 0.3, sz * 2)
-      airGlow.addColorStop(0, `rgba(255, ${160 + lan.hue * 2}, ${60 + lan.hue}, ${0.1 * flicker})`)
-      airGlow.addColorStop(1, 'transparent')
-      ctx.fillStyle = airGlow
+      // --- Hull ---
+      // Junk hull: wide flat bottom, flared bow (right), raised stern (left)
+      const hullW = sz * 1.4
+      const hullH = sz * 0.35
+      const hullTop = 0
+      const bowX = hullW * 0.5      // right side (forward)
+      const sternX = -hullW * 0.5   // left side (aft)
+
       ctx.beginPath()
-      ctx.arc(0, -half * 0.3, sz * 2, 0, Math.PI * 2)
-      ctx.fill()
+      // Start at stern waterline
+      ctx.moveTo(sternX, hullTop)
+      // Stern rises up slightly
+      ctx.lineTo(sternX - sz * 0.05, hullTop - hullH * 0.3)
+      // Deck line across to bow
+      ctx.lineTo(bowX + sz * 0.12, hullTop - hullH * 0.15)
+      // Bow tip curves up and forward
+      ctx.lineTo(bowX + sz * 0.22, hullTop - hullH * 0.6)
+      // Down to bow waterline
+      ctx.quadraticCurveTo(bowX + sz * 0.15, hullTop + hullH * 0.2, bowX, hullTop + hullH * 0.6)
+      // Flat bottom with gentle curve
+      ctx.quadraticCurveTo(0, hullTop + hullH * 0.85, sternX + sz * 0.05, hullTop + hullH * 0.5)
+      // Back up to stern
+      ctx.closePath()
 
-      // --- Wooden raft base ---
-      // Flat platform sitting on water surface
-      const raftH = sz * 0.15
-      const raftW = sz * 1.3
-      const raftY = half * 0.3
-      ctx.fillStyle = `rgba(60, 35, 18, ${0.9 * flicker})`
-      ctx.fillRect(-raftW / 2, raftY, raftW, raftH)
-      // Raft edge highlight
-      ctx.fillStyle = `rgba(90, 55, 28, ${0.5 * flicker})`
-      ctx.fillRect(-raftW / 2, raftY, raftW, 1.5)
-      // Raft planks (subtle)
-      ctx.strokeStyle = `rgba(40, 22, 10, ${0.4 * flicker})`
+      // Hull fill: dark wood
+      const hullGrad = ctx.createLinearGradient(0, hullTop - hullH, 0, hullTop + hullH)
+      hullGrad.addColorStop(0, jk.hullColor)
+      hullGrad.addColorStop(1, '#1a0c04')
+      ctx.fillStyle = hullGrad
+      ctx.fill()
+      // Hull outline
+      ctx.strokeStyle = `rgba(20, 10, 5, 0.7)`
+      ctx.lineWidth = 1
+      ctx.stroke()
+
+      // --- Hull plank lines ---
+      ctx.strokeStyle = `rgba(90, 55, 25, 0.25)`
       ctx.lineWidth = 0.5
-      for (let p = -raftW / 2 + raftW * 0.25; p < raftW / 2; p += raftW * 0.25) {
+      for (let i = 1; i <= 2; i++) {
+        const py = hullTop + hullH * (0.15 * i)
         ctx.beginPath()
-        ctx.moveTo(p, raftY)
-        ctx.lineTo(p, raftY + raftH)
+        ctx.moveTo(sternX + sz * 0.05, py)
+        ctx.lineTo(bowX, py)
         ctx.stroke()
       }
 
-      // --- Paper body (square) ---
-      const bodyTop = -half * 0.9
-      const bodyH = sz * 1.1
-      const bodyW = sz * 0.95
-      // Warm paper gradient: lit from inside
-      const paperGrad = ctx.createRadialGradient(
-        0, bodyTop + bodyH * 0.45, sz * 0.1,
-        0, bodyTop + bodyH * 0.45, sz * 0.7
-      )
-      paperGrad.addColorStop(0, `rgba(255, ${200 + lan.hue}, ${100 + lan.hue * 2}, ${lan.paperAlpha * flicker})`)
-      paperGrad.addColorStop(0.5, `rgba(255, ${160 + lan.hue}, ${60 + lan.hue}, ${(lan.paperAlpha - 0.1) * flicker})`)
-      paperGrad.addColorStop(1, `rgba(200, ${110 + lan.hue}, ${30 + lan.hue}, ${(lan.paperAlpha - 0.2) * flicker})`)
-      ctx.fillStyle = paperGrad
-      ctx.fillRect(-bodyW / 2, bodyTop, bodyW, bodyH)
-
-      // --- Wooden frame edges ---
-      ctx.strokeStyle = `rgba(70, 38, 15, ${0.7 * flicker})`
-      ctx.lineWidth = 1.2
-      // Outer frame rectangle
-      ctx.strokeRect(-bodyW / 2, bodyTop, bodyW, bodyH)
-      // Cross frame: vertical center
+      // --- Deck highlight ---
+      ctx.fillStyle = `rgba(100, 60, 28, 0.5)`
       ctx.beginPath()
-      ctx.moveTo(0, bodyTop)
-      ctx.lineTo(0, bodyTop + bodyH)
-      ctx.stroke()
-      // Cross frame: horizontal center
-      ctx.beginPath()
-      ctx.moveTo(-bodyW / 2, bodyTop + bodyH * 0.5)
-      ctx.lineTo(bodyW / 2, bodyTop + bodyH * 0.5)
-      ctx.stroke()
-
-      // --- Roof cap ---
-      const roofY = bodyTop - sz * 0.08
-      const roofW = bodyW * 1.15
-      const roofH = sz * 0.12
-      ctx.fillStyle = `rgba(55, 30, 15, ${0.85 * flicker})`
-      ctx.beginPath()
-      ctx.moveTo(-roofW / 2, bodyTop)
-      ctx.lineTo(0, roofY)
-      ctx.lineTo(roofW / 2, bodyTop)
+      ctx.moveTo(sternX + sz * 0.02, hullTop - hullH * 0.15)
+      ctx.lineTo(bowX + sz * 0.08, hullTop - hullH * 0.08)
+      ctx.lineTo(bowX + sz * 0.05, hullTop + hullH * 0.05)
+      ctx.lineTo(sternX + sz * 0.05, hullTop + hullH * 0.05)
       ctx.closePath()
       ctx.fill()
-      // Roof edge
-      ctx.fillRect(-roofW / 2 - 1, bodyTop - 1, roofW + 2, 2)
 
-      // --- Small finial on top ---
-      ctx.fillStyle = `rgba(70, 40, 18, ${0.8 * flicker})`
-      ctx.fillRect(-1.5, roofY - 4, 3, 4)
+      // --- Stern cabin ---
+      const cabinW = sz * 0.3
+      const cabinH = sz * 0.28
+      const cabinX = sternX + sz * 0.08
+      const cabinY = hullTop - hullH * 0.15 - cabinH
+      ctx.fillStyle = `rgba(70, 40, 18, 0.9)`
+      ctx.fillRect(cabinX, cabinY, cabinW, cabinH)
+      // Cabin roof (slightly wider, slight overhang)
+      ctx.fillStyle = `rgba(50, 28, 12, 0.95)`
+      ctx.fillRect(cabinX - 2, cabinY - 3, cabinW + 4, 4)
+      // Cabin window (warm glow)
+      ctx.fillStyle = `rgba(255, ${180 + jk.lanternHue}, ${80 + jk.lanternHue}, ${0.6 * flicker})`
+      ctx.fillRect(cabinX + cabinW * 0.25, cabinY + cabinH * 0.3, cabinW * 0.5, cabinH * 0.4)
+      // Window frame
+      ctx.strokeStyle = `rgba(40, 22, 10, 0.6)`
+      ctx.lineWidth = 0.6
+      ctx.strokeRect(cabinX + cabinW * 0.25, cabinY + cabinH * 0.3, cabinW * 0.5, cabinH * 0.4)
 
-      // --- Candle flame inside (bright core) ---
-      const flameX = Math.sin(t * 0.1 + lan.tiltOffset) * 1.2
-      const flameY = bodyTop + bodyH * 0.42
-      const flameGrad = ctx.createRadialGradient(
-        flameX, flameY, 0,
-        flameX, flameY, sz * 0.18
-      )
-      flameGrad.addColorStop(0, `rgba(255, 255, 220, ${0.6 * flicker})`)
-      flameGrad.addColorStop(0.4, `rgba(255, 200, 80, ${0.3 * flicker})`)
-      flameGrad.addColorStop(1, 'transparent')
-      ctx.fillStyle = flameGrad
+      // --- Mast and batten sails ---
+      const drawSail = (mastX, mastH, sailW, sailH, sailTop) => {
+        // Mast
+        ctx.strokeStyle = `rgba(60, 35, 15, 0.9)`
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        ctx.moveTo(mastX, hullTop - hullH * 0.1)
+        ctx.lineTo(mastX, hullTop - hullH * 0.1 - mastH)
+        ctx.stroke()
+
+        // Sail: trapezoidal (wider at bottom, narrower at top), leaning slightly
+        const sTop = hullTop - hullH * 0.1 - sailTop
+        const sBot = sTop + sailH
+        const lean = sz * 0.04
+        const topW = sailW * 0.6
+        const botW = sailW
+
+        ctx.beginPath()
+        ctx.moveTo(mastX + lean - topW * 0.3, sTop)
+        ctx.lineTo(mastX + lean + topW * 0.7, sTop)
+        ctx.lineTo(mastX + botW * 0.7, sBot)
+        ctx.lineTo(mastX - botW * 0.3, sBot)
+        ctx.closePath()
+
+        // Sail gradient
+        const sailGrad = ctx.createLinearGradient(mastX, sTop, mastX, sBot)
+        const sc = jk.sailColor
+        sailGrad.addColorStop(0, sc)
+        sailGrad.addColorStop(0.5, sc)
+        sailGrad.addColorStop(1, '#6a1a08')
+        ctx.fillStyle = sailGrad
+        ctx.globalAlpha = 0.88
+        ctx.fill()
+        ctx.globalAlpha = 1
+        ctx.strokeStyle = `rgba(60, 15, 5, 0.5)`
+        ctx.lineWidth = 0.6
+        ctx.stroke()
+
+        // Batten lines (horizontal bamboo rods)
+        const battens = 4
+        ctx.strokeStyle = `rgba(40, 20, 8, 0.5)`
+        ctx.lineWidth = 0.7
+        for (let b = 1; b < battens; b++) {
+          const frac = b / battens
+          const by = sTop + sailH * frac
+          const bw = topW + (botW - topW) * frac
+          ctx.beginPath()
+          ctx.moveTo(mastX + lean * (1 - frac) - bw * 0.3, by)
+          ctx.lineTo(mastX + lean * (1 - frac) + bw * 0.7, by)
+          ctx.stroke()
+        }
+      }
+
+      // Main sail
+      const mainMastX = sternX + hullW * 0.45
+      drawSail(mainMastX, sz * 1.3, sz * 0.65, sz * 0.9, sz * 1.2)
+
+      // Second sail (if present, shorter and forward)
+      if (jk.numSails >= 2) {
+        const fwdMastX = sternX + hullW * 0.78
+        drawSail(fwdMastX, sz * 0.95, sz * 0.45, sz * 0.6, sz * 0.85)
+      }
+
+      // --- Small stern lantern ---
+      const lanX = sternX + sz * 0.06
+      const lanY = cabinY - 6
+      const lGlow = ctx.createRadialGradient(lanX, lanY, 0, lanX, lanY, sz * 0.15)
+      lGlow.addColorStop(0, `rgba(255, 240, 180, ${0.7 * flicker})`)
+      lGlow.addColorStop(0.5, `rgba(255, ${180 + jk.lanternHue}, ${70 + jk.lanternHue}, ${0.3 * flicker})`)
+      lGlow.addColorStop(1, 'transparent')
+      ctx.fillStyle = lGlow
       ctx.beginPath()
-      ctx.arc(flameX, flameY, sz * 0.18, 0, Math.PI * 2)
+      ctx.arc(lanX, lanY, sz * 0.15, 0, Math.PI * 2)
       ctx.fill()
+      // Lantern body (tiny rectangle)
+      ctx.fillStyle = `rgba(255, ${200 + jk.lanternHue}, ${100 + jk.lanternHue}, ${0.85 * flicker})`
+      ctx.fillRect(lanX - 2, lanY - 2.5, 4, 5)
+      ctx.strokeStyle = `rgba(80, 40, 15, 0.6)`
+      ctx.lineWidth = 0.4
+      ctx.strokeRect(lanX - 2, lanY - 2.5, 4, 5)
 
       ctx.restore()
     })
