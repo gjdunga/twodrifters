@@ -105,8 +105,8 @@ export default function PondScene() {
     ctx.fill()
 
     // ---- MOON ----
-    const moonX = w * 0.68
-    const moonY = waterLine * 0.32
+    const moonX = w * 0.5
+    const moonY = waterLine * 0.38
     const moonR = Math.min(w, h) * 0.065
 
     // Moon glow
@@ -151,12 +151,31 @@ export default function PondScene() {
     ctx.fillRect(0, waterLine, w, h - waterLine)
 
     // ---- MOON REFLECTION on water ----
-    const reflY = waterLine + (waterLine - moonY) * 0.3
-    for (let i = 0; i < 30; i++) {
-      const segY = reflY + i * 4
-      const waveOff = Math.sin(t * 0.015 + i * 0.4) * (3 + i * 0.5)
-      const alpha = Math.max(0, 0.15 - i * 0.004)
-      const segW = moonR * (1.2 + i * 0.1)
+    // Mirror position: same distance below waterline as moon is above it
+    const moonDistAbove = waterLine - moonY
+    const reflStartY = waterLine + moonDistAbove * 0.15
+    // Bright disc reflection near waterline (compressed vertically)
+    const reflDiscGrad = ctx.createRadialGradient(
+      moonX, reflStartY + moonR * 0.5, moonR * 0.2,
+      moonX, reflStartY + moonR * 0.5, moonR * 2
+    )
+    reflDiscGrad.addColorStop(0, 'rgba(255, 239, 213, 0.12)')
+    reflDiscGrad.addColorStop(0.4, 'rgba(255, 239, 213, 0.06)')
+    reflDiscGrad.addColorStop(1, 'transparent')
+    ctx.fillStyle = reflDiscGrad
+    ctx.beginPath()
+    ctx.ellipse(moonX, reflStartY + moonR * 0.5, moonR * 2, moonR * 1.2, 0, 0, Math.PI * 2)
+    ctx.fill()
+
+    // Shimmering column of light stretching down from reflection
+    for (let i = 0; i < 40; i++) {
+      const segY = reflStartY + i * 3.5
+      if (segY > h) break
+      const waveOff = Math.sin(t * 0.012 + i * 0.35) * (2 + i * 0.4)
+      const progress = i / 40
+      const alpha = Math.max(0, 0.14 * (1 - progress * 0.7))
+      // Column narrows then widens slightly as it descends
+      const segW = moonR * (0.8 + Math.sin(progress * Math.PI) * 1.5 + progress * 0.5)
       ctx.beginPath()
       ctx.ellipse(moonX + waveOff, segY, segW, 1.5, 0, 0, Math.PI * 2)
       ctx.fillStyle = `rgba(255, 239, 213, ${alpha})`
