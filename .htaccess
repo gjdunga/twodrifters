@@ -2,6 +2,10 @@
     RewriteEngine On
     RewriteBase /
 
+    # Block access to source and data directories
+    RewriteRule ^_build/ - [F,L]
+    RewriteRule ^data/ - [F,L]
+
     # HTTPS redirect (uncomment when SSL is configured)
     # RewriteCond %{HTTPS} off
     # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]

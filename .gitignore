@@ -1,5 +1,5 @@
-node_modules/
+_build/node_modules/
+_build/.vite/
+data/contact/
 .DS_Store
 *.log
-public_html/data/contact/
-frontend/.vite/

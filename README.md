@@ -1,84 +1,90 @@
 # Two Drifters: A Virtual Museum
 
-A serene, Japanese Shinto temple-inspired virtual museum celebrating the adventures of Pat and Jack.
+Japanese Shinto temple-inspired virtual museum for the adventures of Pat and Jack.
 
-## Architecture
+## Repo Structure
 
-**Frontend**: React 19 + Vite, built to static files
-**Backend**: PHP 8.1 for contact form and SPA routing
-**Server**: Apache on Virtualmin 8.0.1 (Ubuntu 24.04.4)
-
-## Directory Structure
+The **repo root IS the document root**. Clone or pull directly into
+`/home/twodrifters/public_html/`.
 
 ```
-twodrifters/
-  frontend/           # React source (development)
+. (repo root = document root = /home/twodrifters/public_html/)
+  .htaccess        # Apache rewrite rules, security headers, compression
+  index.html       # React SPA entry (built output)
+  index.php        # PHP fallback router
+  assets/          # Built JS and CSS (hashed filenames)
+  api/
+    contact.php    # Contact form endpoint
+    diag.php       # Deployment diagnostic (DELETE after site works)
+  audio/           # (your audio files, not in repo)
+  _build/          # React source code (blocked from web access by .htaccess)
     src/
-      components/     # Reusable UI components
-      pages/          # Route pages
-      hooks/          # Audio context and custom hooks
-      data/           # Site content data
-  public_html/        # Production build output (deploy this)
-    index.html        # Built React SPA
-    index.php         # PHP fallback and SPA router
-    .htaccess         # Apache rewrite rules
-    api/
-      contact.php     # Contact form endpoint
-    assets/           # Built JS, CSS
+    vite.config.js
+    package.json
+```
+
+## Deployment (Virtualmin 8.0.1, Ubuntu 24.04)
+
+**First time:**
+```bash
+cd /home/twodrifters/public_html
+git init
+git remote add origin https://github.com/gjdunga/twodrifters.git
+git fetch origin main
+git checkout main
+```
+
+This preserves any existing files (like your audio/ directory) that are
+not tracked by git.
+
+**Subsequent updates:**
+```bash
+cd /home/twodrifters/public_html
+git pull origin main
+```
+
+**Verify Apache modules:**
+```bash
+sudo a2enmod rewrite headers deflate expires
+sudo systemctl reload apache2
+```
+
+**Verify AllowOverride** in the virtual host config
+(`/etc/apache2/sites-available/twodrifters.org.conf` or similar):
+```apache
+<Directory /home/twodrifters/public_html>
+    AllowOverride All
+</Directory>
+```
+
+**Run the diagnostic:**
+Visit `https://twodrifters.org/api/diag.php` to check that all files
+are in place, modules are loaded, and .htaccess is being read.
+Delete `api/diag.php` after the site is working.
+
+**Contact form setup:**
+```bash
+mkdir -p /home/twodrifters/public_html/data/contact
+chown www-data:www-data /home/twodrifters/public_html/data/contact
+# Edit api/contact.php and set the $to email address
 ```
 
 ## Development
 
 ```bash
-cd frontend
+cd _build
 npm install
-npm run dev          # Start dev server on localhost:5173
-npm run build        # Build to ../public_html/
+npm run dev        # Dev server on localhost:5173
+npm run build      # Outputs to repo root (../)
 ```
 
-## Deployment to Virtualmin
-
-1. Point the virtual server's document root to the `public_html/` directory
-   (or copy its contents to the existing document root)
-
-2. Ensure Apache modules are enabled:
-   ```bash
-   sudo a2enmod rewrite headers deflate expires
-   sudo systemctl reload apache2
-   ```
-
-3. Verify `.htaccess` is respected (AllowOverride All in the virtual host config)
-
-4. For the contact form, edit `public_html/api/contact.php` and set the
-   recipient email address in the `$to` variable
-
-5. Create the data directory with proper permissions:
-   ```bash
-   mkdir -p public_html/data/contact
-   chown www-data:www-data public_html/data/contact
-   chmod 750 public_html/data/contact
-   ```
+After building, commit and push the updated `index.html` and `assets/`.
 
 ## Audio
 
-The site plays background music on each page. The home page attempts to load
-a symphonic Moon River arrangement. Because this composition is under copyright,
-you will need to either:
+The home page tries `/audio/moonriver-syphonic.mp3` first, then falls
+back to a royalty-free ambient track. Other pages pick randomly from
+ambient CDN tracks.
 
-1. License a symphonic arrangement and place it at `public_html/audio/moonriver-symphonic.mp3`
-2. Use the built-in royalty-free ambient fallback (already configured)
-3. Replace with any CC0/royalty-free alternative
-
-Other pages randomly select from ambient tracks served via Pixabay's free audio CDN.
-
-## Customization
-
-All site content (journey entries, couple bios, audio tracks) is defined in
-`frontend/src/data/siteData.js`. Edit this file and rebuild to update content.
-
-To add photos to the Temple of Children or Temple of Ancestors, replace the
-placeholder cards in the respective page components.
-
-## License
-
-Private site for Pat and Jack. All rights reserved.
+Place audio files in the `audio/` directory at the document root.
+This directory is not tracked by git.

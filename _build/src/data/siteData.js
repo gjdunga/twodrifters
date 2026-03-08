@@ -101,7 +101,7 @@ export const siteData = {
       label: 'Moon River (Symphonic)',
       // Placeholder: replace with licensed or original symphonic Moon River
       // Using royalty-free ambient as fallback
-      url: '/audio/moonriver-symphonic.mp3',
+      url: '/audio/moonriver-syphonic.mp3',
       fallbackUrl: 'https://cdn.pixabay.com/audio/2024/11/04/audio_a2dce20968.mp3',
     },
     ambient: [
